@@ -218,7 +218,3 @@ devintr()
     return 0;
   }
 }
-
-void f() {
-    // hhaha
-}
