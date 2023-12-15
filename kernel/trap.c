@@ -220,5 +220,5 @@ devintr()
 }
 
 void f() {
-    // hhaha
+    // test push and merge
 }
