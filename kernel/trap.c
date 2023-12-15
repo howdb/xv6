@@ -219,3 +219,6 @@ devintr()
   }
 }
 
+void f() {
+    // hhaha
+}
