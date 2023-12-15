@@ -268,6 +268,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
+// leaf page is freed alone, but when recurse will stop?
 void
 freewalk(pagetable_t pagetable)
 {
@@ -436,4 +437,29 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void vmprint_helper(pagetable_t pagetable, int depth) {
+  static char *indent[] = {
+    " ..",
+    " .. ..",
+    " .. .. .."
+  };
+  if (depth < 0 || depth >= 3) {
+    return;
+  }
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V)){
+      printf("%s%d: pte %p pa %p\n", indent[depth], i, pte, PTE2PA(pte));
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      vmprint_helper((pagetable_t)child, depth + 1);
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  vmprint_helper(pagetable, 0);
 }

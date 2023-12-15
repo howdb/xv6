@@ -75,6 +75,19 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 p;
+  argaddr(0, &p);
+
+  int n;
+  argint(1, &n);
+
+  int abits;
+  argint(2, &abits);
+
+  if (n < 0 || n > 32) {
+    return -1;
+  }
+  
   return 0;
 }
 #endif
