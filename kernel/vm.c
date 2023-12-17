@@ -315,15 +315,19 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+    if (*pte & PTE_W) {
+      *pte = (*pte & ~PTE_W) | PTE_COW;
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    // if((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char*)pa, PGSIZE);
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      // kfree(mem);
       goto err;
     }
+    krefpage((void *)pa);
   }
   return 0;
 
@@ -354,6 +358,9 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   uint64 n, va0, pa0;
 
   while(len > 0){
+    if (uvmcheckcowpage(dstva)) {
+      uvmcowcopy(dstva);
+    }
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
@@ -436,4 +443,30 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int uvmcheckcowpage(uint64 va) {
+  struct proc *p = myproc();
+  pte_t *pte;
+  return va < p->sz && ((pte = walk(p->pagetable, va, 0)) != 0) && (*pte & PTE_V) && (*pte & PTE_COW);
+}
+
+int uvmcowcopy(uint64 va) {
+  struct proc *p = myproc();
+  pte_t *pte;
+  if((pte = walk(p->pagetable, va, 0)) == 0) {
+    panic("uvmcowcopy: walk");
+  }
+  uint64 pa = PTE2PA(*pte);
+  uint64 new_pa = (uint64)kcopy_deref_page(pa);
+  if (new_pa == 0) {
+    return -1;
+  }
+
+  uint flags = (PTE_FLAGS(*pte) | PTE_W) & ~PTE_COW;
+  uvmunmap(p->pagetable, PGROUNDDOWN(va), 1, 0);
+  if (mappages(p->pagetable, va, PGSIZE, new_pa, flags) == -1) {
+    panic("uvmcowcopy: mappages");
+  }
+  return 0;
 }
